@@ -1,4 +1,4 @@
-name: 'fundamentals_dbt_course_test1':
+fundamentals_dbt_course_test1:
   outputs:
     dev:
       dataset: jaffle_shop
