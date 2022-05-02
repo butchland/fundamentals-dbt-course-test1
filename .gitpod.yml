@@ -1,0 +1,67 @@
+# List the start up tasks. Learn more https://www.gitpod.io/docs/config-start-tasks/
+
+
+tasks:
+  - name: term1
+    init: |
+      mkdir -p .extensions
+      curl -s https://raw.githubusercontent.com/butchland/dbt-bigquery-gitpod-config/main/extensions/bastienboutonnet.vscode-dbt-0.5.1.vsix -o .extensions/bastienboutonnet.vscode-dbt-0.5.1.vsix
+      curl -s https://raw.githubusercontent.com/butchland/dbt-bigquery-gitpod-config/main/extensions/vscode-sqlfluff-0.0.5.vsix -o .extensions/vscode-sqlfluff-0.0.5.vsix
+      echo Done downloading extensions
+
+    command: |
+      unset CREDENTIALS_JSON
+      gp await-port 23000 
+      code --install-extension .extensions/bastienboutonnet.vscode-dbt-0.5.1.vsix
+      code --install-extension .extensions/vscode-sqlfluff-0.0.5.vsix
+      echo Done installing extensions
+      gp sync-await term2
+      export GOOGLE_APPLICATION_CREDENTIALS=$GITPOD_REPO_ROOT/.credentials/service-account.json
+      export PROJECT_ID=$(cat .credentials/service-account.json | jq '.project_id' | tr -d '"')
+      source venv/bin/activate
+      dbt compile
+
+
+  - name: term2
+    init: |
+      virtualenv -p /home/gitpod/.pyenv/shims/python3 venv
+      source venv/bin/activate
+      pip install -r requirements.txt
+      echo Done install python requirements
+      sudo apt-get install -y gettext
+      mkdir -p .credentials
+      echo $CREDENTIALS_JSON >> .credentials/service-account.json
+      export GOOGLE_APPLICATION_CREDENTIALS=$GITPOD_REPO_ROOT/.credentials/service-account.json
+      gp env GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS
+      export PROJECT_ID=$(cat .credentials/service-account.json | jq '.project_id' | tr -d '"')
+      gp env PROJECT_ID=$PROJECT_ID
+      unset CREDENTIALS_JSON       
+      mkdir -p .vscode
+      [ ! -e .vscode/settings.json ] && cat gitpod-vscode-settings.json | sed -E 's/\$\$([A-Z]+)\$\$/${\1}/g' | envsubst >> temp-gitpod-vscode-settings.json
+      [ ! -e .vscode/settings.json ] && mv temp-gitpod-vscode-settings.json .vscode/settings.json
+      echo Done creating vscode settings
+    command: |
+      export GOOGLE_APPLICATION_CREDENTIALS=$GITPOD_REPO_ROOT/.credentials/service-account.json
+      export PROJECT_ID=$(cat .credentials/service-account.json | jq '.project_id' | tr -d '"')
+      echo PROJECT_ID set to $PROJECT_ID
+      echo GOOGLE_APPLICATION_CREDENTIALS set to $GOOGLE_APPLICATION_CREDENTIALS
+      echo vscode settings 
+      cat .vscode/settings.json
+      unset CREDENTIALS_JSON
+      source deactivate
+      source venv/bin/activate
+      mkdir -p $HOME/.dbt
+      [ ! -e $HOME/.dbt/profiles.yml ] && cp gitpod-dbt-profiles.yml $HOME/.dbt/profiles.yml 
+      export GOOGLE_APPLICATION_CREDENTIALS=$GITPOD_REPO_ROOT/.credentials/service-account.json
+      echo Done profiles setup
+      gp sync-done term2
+      dbt docs generate
+      dbt docs serve --no-browser --port 3000
+
+# List the ports to expose. Learn more https://www.gitpod.io/docs/config-ports/
+ports:
+  - port: 3000
+    onOpen: open-preview
+vscode:
+  extensions:
+    [ms-python.python, ms-toolsai.jupyter,ms-toolsai.jupyter-keymap,ms-toolsai.jupyter-renderers, samuelcolvin.jinjahtml, butchland.vscode-dbt-bigquery-power-user, dorzey.vscode-sqlfluff, bastienboutonnet.vscode-dbt]
